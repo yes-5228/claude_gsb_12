@@ -3,10 +3,14 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { issueApi } from '../../api/issues.js';
 import { restroomApi } from '../../api/restrooms.js';
+import { statsApi } from '../../api/stats.js';
 import DataTable from '../../components/DataTable.jsx';
 import Field from '../../components/Field.jsx';
+import GroupSummaryCard from '../../components/GroupSummaryCard.jsx';
+import MethodologyButton from '../../components/MethodologyButton.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Pagination from '../../components/Pagination.jsx';
+import ScopeFields from '../../components/ScopeFields.jsx';
 import { OverdueTag, SeverityTag, StatusTag } from '../../components/Tags.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -18,6 +22,7 @@ import IssueFormModal from './IssueFormModal.jsx';
 const DEFAULT_FILTERS = {
   keyword: '',
   district: '',
+  grade: '',
   status: '',
   category: '',
   severity: '',
@@ -34,6 +39,8 @@ export default function IssueListPage() {
 
   const list = useListQuery((params) => issueApi.list(params), DEFAULT_FILTERS, 10);
   const { data: districts } = useAsync(() => restroomApi.districts(), []);
+  const filterKey = JSON.stringify(list.filters);
+  const summary = useAsync(() => statsApi.issueSummary(list.filters), [filterKey]);
 
   // 支持从巡查记录跳转过来直接上报问题
   useEffect(() => {
@@ -119,17 +126,12 @@ export default function IssueListPage() {
                 ))}
               </select>
             </Field>
-            <Field label="所属区域">
-              <select
-                value={list.filters.district}
-                onChange={(event) => list.updateFilter('district', event.target.value)}
-              >
-                <option value="">全部</option>
-                {(districts || []).map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </Field>
+            <ScopeFields
+              districts={districts || []}
+              grades={dictionaries?.restroom_grade || []}
+              value={list.filters}
+              onChange={list.updateFilter}
+            />
             <Field label="超期情况">
               <select
                 value={list.filters.overdue}
@@ -151,8 +153,11 @@ export default function IssueListPage() {
             <button type="button" className="btn" onClick={list.resetFilters}>
               重置
             </button>
+            <MethodologyButton />
           </div>
         </section>
+
+        <GroupSummaryCard title="问题分组统计" loading={summary.loading} summary={summary.data} />
 
         <section className="card">
           <DataTable
@@ -179,6 +184,12 @@ export default function IssueListPage() {
                   ),
               },
               { key: 'category', title: '分类' },
+              { key: 'district', title: '区域', render: (row) => row.restroom?.district ?? '-' },
+              {
+                key: 'restroom_grade',
+                title: '公厕等级',
+                render: (row) => row.restroom?.grade ?? '-',
+              },
               {
                 key: 'severity',
                 title: '程度',

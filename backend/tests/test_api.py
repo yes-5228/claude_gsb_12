@@ -223,3 +223,123 @@ def test_dashboard_stats(client, restroom):
     }
     assert payload["top_restrooms"]
     assert "rectification_rate" in overview
+
+
+def _create_restroom(client, name, district, grade):
+    response = client.post(
+        "/api/v1/restrooms",
+        json={"name": name, "district": district, "address": f"{district}路", "grade": grade},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_list_grade_filter_uses_restroom_grade(client):
+    """巡查与问题列表都支持按公厕等级（一类/二类/三类）过滤。"""
+    first = _create_restroom(client, "口径一类公厕", "口径东区", "一类")
+    second = _create_restroom(client, "口径二类公厕", "口径西区", "二类")
+
+    for rid in (first["id"], second["id"]):
+        client.post(
+            "/api/v1/inspections",
+            json={"restroom_id": rid, "inspector": "口径巡查", "items": full_items(8)},
+        )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": first["id"], "title": "一类公厕问题", "category": "其他"},
+    )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": second["id"], "title": "二类公厕问题", "category": "其他"},
+    )
+
+    inspections = client.get("/api/v1/inspections", params={"grade": "一类"}).json()
+    inspection_ids = {item["restroom_id"] for item in inspections["items"]}
+    assert first["id"] in inspection_ids
+    assert second["id"] not in inspection_ids
+
+    issues = client.get("/api/v1/issues", params={"grade": "二类"}).json()
+    issue_ids = {item["restroom_id"] for item in issues["items"]}
+    assert second["id"] in issue_ids
+    assert first["id"] not in issue_ids
+
+
+def test_scope_consistency_across_list_group_dashboard(client):
+    """同一筛选下，列表、分组汇总、看板三处的巡查/问题数量必须一致。"""
+    first = _create_restroom(client, "对表一类公厕", "对表区", "一类")
+    client.post(
+        "/api/v1/inspections",
+        json={"restroom_id": first["id"], "inspector": "对表巡查", "items": full_items(9)},
+    )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": first["id"], "title": "对表问题", "category": "设施损坏"},
+    )
+
+    # 巡查：列表总数 == 分组汇总 total == 看板 inspection_total
+    list_total = client.get("/api/v1/inspections", params={"grade": "一类"}).json()["meta"]["total"]
+    summary = client.get("/api/v1/stats/inspections/summary", params={"grade": "一类"}).json()
+    dashboard = client.get("/api/v1/stats/dashboard", params={"grade": "一类"}).json()
+    assert summary["total"] == list_total
+    assert sum(item["value"] for item in summary["by_grade"]) == list_total
+    grade_bucket = {item["name"]: item["value"] for item in summary["by_grade"]}
+    assert grade_bucket["一类"] == list_total
+    assert dashboard["overview"]["inspection_total"] == list_total
+    assert dashboard["scope"] == {"district": None, "grade": "一类"}
+
+    # 区域维度分组里该等级只有一类公厕
+    grade_dim = {item["name"]: item for item in dashboard["by_grade"]}
+    assert "一类" in grade_dim
+    assert grade_dim["一类"]["restroom_count"] >= 1
+
+    # 问题：按区域收敛后列表总数 == 分组汇总 total == 看板 issue_total
+    issue_list_total = client.get("/api/v1/issues", params={"district": "对表区"}).json()["meta"][
+        "total"
+    ]
+    issue_summary = client.get(
+        "/api/v1/stats/issues/summary", params={"district": "对表区"}
+    ).json()
+    issue_dashboard = client.get("/api/v1/stats/dashboard", params={"district": "对表区"}).json()
+    assert issue_summary["total"] == issue_list_total
+    assert issue_dashboard["overview"]["issue_total"] == issue_list_total
+    district_dim = {item["name"]: item for item in issue_dashboard["by_district"]}
+    assert "对表区" in district_dim
+    assert district_dim["对表区"]["issue_total"] == issue_list_total
+
+    # 区域 + 等级同时收敛
+    both = client.get(
+        "/api/v1/stats/dashboard", params={"district": "对表区", "grade": "一类"}
+    ).json()
+    assert both["scope"] == {"district": "对表区", "grade": "一类"}
+    assert both["overview"]["inspection_total"] == 1
+    assert both["overview"]["issue_total"] == 1
+
+
+def test_summary_without_scope_still_groups(client, restroom):
+    """无任何筛选时分组汇总也必须完整（whereclause 为空不能吞掉分组）。"""
+    client.post(
+        "/api/v1/inspections",
+        json={"restroom_id": restroom["id"], "inspector": "全量巡查", "items": full_items(7)},
+    )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": restroom["id"], "title": "全量问题"},
+    )
+    inspection_summary = client.get("/api/v1/stats/inspections/summary").json()
+    assert inspection_summary["by_district"]
+    assert inspection_summary["by_grade"]
+    assert sum(item["value"] for item in inspection_summary["by_grade"]) == inspection_summary["total"]
+
+    issue_summary = client.get("/api/v1/stats/issues/summary").json()
+    assert issue_summary["by_district"]
+    assert sum(item["value"] for item in issue_summary["by_district"]) == issue_summary["total"]
+
+
+def test_methodology_explains_caliber(client):
+    payload = client.get("/api/v1/stats/methodology").json()
+    assert payload["grade_options"] == ["一类", "二类", "三类"]
+    assert set(payload["open_statuses"]) == {"待整改", "整改中", "待验收"}
+    assert payload["dimensions"] == ["区域", "公厕等级"]
+    # 明确区分“公厕等级”与巡查“评分等级”
+    assert "评分等级" in payload["grade_basis"]
+    assert "同一套" in payload["consistency_rule"]

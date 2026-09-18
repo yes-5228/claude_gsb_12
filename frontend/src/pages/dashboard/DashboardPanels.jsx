@@ -63,27 +63,53 @@ export function CategoryPanel({ items }) {
   );
 }
 
+function dimensionColumns() {
+  return [
+    {
+      key: 'restroom_count',
+      title: '公厕数',
+    },
+    { key: 'inspection_count', title: '巡查数' },
+    { key: 'issue_total', title: '问题累计' },
+    { key: 'issue_open', title: '未闭环' },
+    { key: 'issue_overdue', title: '超期' },
+    {
+      key: 'avg_score',
+      title: '巡查均分',
+      render: (row) => (row.avg_score ? <ScorePill score={row.avg_score} /> : '-'),
+    },
+  ];
+}
+
 export function DistrictPanel({ items }) {
   return (
     <section className="card">
       <div className="card-title">
-        <h3>区域运行情况</h3>
-        <span className="hint">按未闭环问题排序</span>
+        <h3>按区域运行情况</h3>
+        <span className="hint">与列表同一口径</span>
       </div>
       <DataTable
-        columns={[
-          { key: 'district', title: '区域' },
-          { key: 'restroom_count', title: '公厕数' },
-          { key: 'issue_open', title: '未闭环' },
-          {
-            key: 'avg_score',
-            title: '巡查均分',
-            render: (row) => (row.avg_score ? <ScorePill score={row.avg_score} /> : '-'),
-          },
-        ]}
+        columns={[{ key: 'name', title: '区域' }, ...dimensionColumns()]}
         rows={items || []}
-        rowKey={(row) => row.district}
+        rowKey={(row) => `district-${row.name}`}
         emptyText="暂无区域数据"
+      />
+    </section>
+  );
+}
+
+export function GradePanel({ items }) {
+  return (
+    <section className="card">
+      <div className="card-title">
+        <h3>按公厕等级运行情况</h3>
+        <span className="hint">一类/二类/三类（非评分等级）</span>
+      </div>
+      <DataTable
+        columns={[{ key: 'name', title: '公厕等级' }, ...dimensionColumns()]}
+        rows={items || []}
+        rowKey={(row) => `grade-${row.name}`}
+        emptyText="暂无等级数据"
       />
     </section>
   );
@@ -104,6 +130,7 @@ export function RankingPanel({ items }) {
             render: (row) => <Link to={`/restrooms/${row.restroom_id}`}>{row.name}</Link>,
           },
           { key: 'district', title: '区域' },
+          { key: 'grade', title: '公厕等级' },
           { key: 'inspection_count', title: '巡查次数' },
           {
             key: 'avg_score',

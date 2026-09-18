@@ -1,14 +1,20 @@
 import { useState } from 'react';
 
+import { restroomApi } from '../../api/restrooms.js';
 import { statsApi } from '../../api/stats.js';
 import BarList from '../../components/BarList.jsx';
+import Field from '../../components/Field.jsx';
+import MethodologyButton from '../../components/MethodologyButton.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import ScopeFields from '../../components/ScopeFields.jsx';
 import StatCard from '../../components/StatCard.jsx';
 import TrendChart from '../../components/TrendChart.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
+import { useDictionaries } from '../../hooks/useDictionaries.js';
 import {
   CategoryPanel,
   DistrictPanel,
+  GradePanel,
   IssueStatusPanel,
   RankingPanel,
   RecentInspectionsPanel,
@@ -18,19 +24,24 @@ import {
 const RANGE_OPTIONS = [7, 14, 30];
 
 export default function DashboardPage() {
+  const { dictionaries } = useDictionaries();
   const [trendDays, setTrendDays] = useState(14);
+  const [district, setDistrict] = useState('');
+  const [grade, setGrade] = useState('');
   const { data, loading, error } = useAsync(
-    () => statsApi.dashboard(trendDays),
-    [trendDays],
+    () => statsApi.dashboard({ trendDays, district, grade }),
+    [trendDays, district, grade],
   );
+  const { data: districts } = useAsync(() => restroomApi.districts(), []);
 
   const overview = data?.overview;
+  const scopeText = `当前口径：${data?.scope?.district || '全部区域'} · ${data?.scope?.grade || '全部等级'}`;
 
   return (
     <>
       <PageHeader
         title="总览看板"
-        description="公厕保洁巡查与问题整改的整体运行情况"
+        description="公厕保洁巡查与问题整改的整体运行情况，区域与公厕等级统计口径一致"
         actions={
           <div className="field" style={{ minWidth: 130 }}>
             <label>统计区间</label>
@@ -45,6 +56,32 @@ export default function DashboardPage() {
         }
       />
       <div className="content">
+        <section className="card">
+          <div className="filter-bar">
+            <ScopeFields
+              districts={districts || []}
+              grades={dictionaries?.restroom_grade || []}
+              value={{ district, grade }}
+              onChange={(key, value) => (key === 'district' ? setDistrict(value) : setGrade(value))}
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setDistrict('');
+                setGrade('');
+              }}
+            >
+              重置
+            </button>
+            <MethodologyButton />
+          </div>
+          <div className="caliber-banner">
+            <span className="tag tag-info">{scopeText}</span>
+            <span className="hint">区域、等级取公厕档案当前值；筛选变化后下方指标同步更新</span>
+          </div>
+        </section>
+
         {error ? <div className="alert alert-error">{error.message}</div> : null}
         {loading && !data ? <div className="loading-block">看板数据加载中…</div> : null}
 
@@ -122,9 +159,11 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid-2">
-              <DistrictPanel items={data.districts} />
-              <RankingPanel items={data.top_restrooms} />
+              <DistrictPanel items={data.by_district} />
+              <GradePanel items={data.by_grade} />
             </div>
+
+            <RankingPanel items={data.top_restrooms} />
 
             <div className="grid-2">
               <RecentIssuesPanel items={data.recent_issues} />

@@ -128,17 +128,20 @@ npm run dev
 | PATCH | `/restrooms/{id}` | 局部更新 |
 | DELETE | `/restrooms/{id}?force=` | 删除；有巡查或问题记录时返回 409，`force=true` 才级联删除 |
 | GET | `/restrooms/meta/districts` | 区域列表（筛选下拉用） |
-| GET | `/inspections` | 巡查记录查询（restroom_id/district/inspector/shift/result/日期区间/关键字） |
+| GET | `/inspections` | 巡查记录查询（restroom_id/district/grade/inspector/shift/result/日期区间/关键字） |
 | POST | `/inspections` | 新增巡查，服务端按检查项自动算分、定级、判定结论 |
 | GET/PATCH/DELETE | `/inspections/{id}` | 详情 / 更新 / 删除 |
-| GET | `/issues` | 问题查询（status/category/severity/district/overdue/open_only/日期区间/关键字） |
+| GET | `/issues` | 问题查询（status/category/severity/district/grade/overdue/open_only/日期区间/关键字） |
 | POST | `/issues` | 上报问题，自动生成编号 `WT-YYYYMMDD-001` 并写入首条整改流水 |
 | GET/PATCH/DELETE | `/issues/{id}` | 详情（含完整整改轨迹）/ 更新 / 删除 |
 | GET | `/issues/{id}/transitions` | 当前状态可执行的流转动作 |
 | POST | `/issues/{id}/transitions` | 推进整改状态（越级流转返回 400） |
 | POST | `/issues/{id}/records` | 追加跟进记录（不改变状态） |
-| GET | `/stats/overview` | 核心指标 |
-| GET | `/stats/dashboard` | 看板聚合数据（趋势、分布、区域、排行、最新记录） |
+| GET | `/stats/overview` | 核心指标（支持 district/grade 按区域、公厕等级过滤） |
+| GET | `/stats/dashboard` | 看板聚合数据（趋势、分布、按区域/等级分组、排行、最新记录；支持 district/grade） |
+| GET | `/stats/inspections/summary` | 巡查列表随筛选联动的区域/公厕等级分组汇总 |
+| GET | `/stats/issues/summary` | 问题列表随筛选联动的区域/公厕等级分组汇总 |
+| GET | `/stats/methodology` | 页面可查看的统计口径说明 |
 | GET | `/meta/dictionaries` | 枚举字典（状态、分类、程度、检查项、流转规则） |
 | GET | `/meta/restroom-options` | 公厕下拉选项 |
 | GET | `/health` | 健康检查 |
@@ -146,6 +149,7 @@ npm run dev
 ## 业务规则
 
 - **巡查评分**：8 个检查项各 0-10 分，得分 = 总得分 / 满分 × 100；≥90 优秀、≥80 良好、≥70 合格，其余不合格。任一检查项低于 6 分或等级为不合格时，巡查结论自动置为「发现问题」。
+- **统计统一口径**：巡查与问题的「区域」「公厕等级」一律取所属公厕档案（Restroom）的当前值；公厕等级仅指一类/二类/三类，与巡查记录自身的评分等级（优秀/良好/合格/不合格）相互独立。列表、区域/等级分组与看板共用同一套过滤条件，筛选区域或等级后三处数字同步更新；各页可点击「统计口径」查看完整说明。
 - **问题编号**：`WT-` + 上报日期 + 当日三位流水号。
 - **整改闭环**：`待整改 → 整改中 → 待验收 → 已完成 → 已关闭`；`待验证` 阶段可被驳回退回 `整改中`，`待整改/整改中` 可直接作废关闭。每次流转都会写入一条整改流水（动作、原状态、新状态、操作人、说明），详情页以时间线呈现。
 - **超期预警**：整改期限早于当前时间且状态仍处于未闭环（待整改/整改中/待验收）时，列表与详情页显示「已超期」，看板统计超期数量。

@@ -50,27 +50,29 @@ def to_out(inspection: Inspection) -> InspectionOut:
     return data
 
 
-def list_inspections(
-    db: Session,
+def build_inspection_stmt(
     *,
     restroom_id: int | None = None,
     district: str | None = None,
+    grade: str | None = None,
     inspector: str | None = None,
     shift: str | None = None,
     result: str | None = None,
     keyword: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
-    page: int = 1,
-    page_size: int = 10,
-    sort_by: str = "inspect_time",
-    order: str = "desc",
-) -> tuple[list[Inspection], int]:
-    stmt = select(Inspection)
+):
+    """构造巡查记录查询语句。
+
+    区域、公厕等级统一取所属公厕档案（Restroom）的当前值，与看板/分组统计
+    使用完全一致的口径；列表、分组、看板三处都复用本函数，避免口径漂移。
+    始终 JOIN Restroom，使所有口径共享同一条关联路径。
+    """
+    stmt = select(Inspection).join(Restroom, Restroom.id == Inspection.restroom_id)
     if district:
-        stmt = stmt.join(Restroom, Restroom.id == Inspection.restroom_id).where(
-            Restroom.district == district
-        )
+        stmt = stmt.where(Restroom.district == district)
+    if grade:
+        stmt = stmt.where(Restroom.grade == grade)
     if restroom_id:
         stmt = stmt.where(Inspection.restroom_id == restroom_id)
     if inspector:
@@ -89,9 +91,40 @@ def list_inspections(
             or_(
                 Inspection.inspector.like(like),
                 Inspection.remark.like(like),
-                Inspection.restroom_id.in_(select(Restroom.id).where(Restroom.name.like(like))),
+                Restroom.name.like(like),
             )
         )
+    return stmt
+
+
+def list_inspections(
+    db: Session,
+    *,
+    restroom_id: int | None = None,
+    district: str | None = None,
+    grade: str | None = None,
+    inspector: str | None = None,
+    shift: str | None = None,
+    result: str | None = None,
+    keyword: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: int = 1,
+    page_size: int = 10,
+    sort_by: str = "inspect_time",
+    order: str = "desc",
+) -> tuple[list[Inspection], int]:
+    stmt = build_inspection_stmt(
+        restroom_id=restroom_id,
+        district=district,
+        grade=grade,
+        inspector=inspector,
+        shift=shift,
+        result=result,
+        keyword=keyword,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     column = SORTABLE_FIELDS.get(sort_by, Inspection.inspect_time)

@@ -3,8 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { inspectionApi } from '../../api/inspections.js';
 import { restroomApi } from '../../api/restrooms.js';
+import { statsApi } from '../../api/stats.js';
 import DataTable from '../../components/DataTable.jsx';
 import Field from '../../components/Field.jsx';
+import GroupSummaryCard from '../../components/GroupSummaryCard.jsx';
+import MethodologyButton from '../../components/MethodologyButton.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Pagination from '../../components/Pagination.jsx';
 import { GradeTag, ScorePill, StatusTag } from '../../components/Tags.jsx';
@@ -13,12 +16,14 @@ import { useAsync } from '../../hooks/useAsync.js';
 import { useDictionaries } from '../../hooks/useDictionaries.js';
 import { useListQuery } from '../../hooks/useListQuery.js';
 import { formatDateTime } from '../../utils/format.js';
+import ScopeFields from '../../components/ScopeFields.jsx';
 import InspectionDetailModal from './InspectionDetailModal.jsx';
 import InspectionFormModal from './InspectionFormModal.jsx';
 
 const DEFAULT_FILTERS = {
   keyword: '',
   district: '',
+  grade: '',
   shift: '',
   result: '',
   date_from: '',
@@ -34,6 +39,11 @@ export default function InspectionListPage() {
 
   const list = useListQuery((params) => inspectionApi.list(params), DEFAULT_FILTERS, 10);
   const { data: districts } = useAsync(() => restroomApi.districts(), []);
+  const filterKey = JSON.stringify(list.filters);
+  const summary = useAsync(
+    () => statsApi.inspectionSummary(list.filters),
+    [filterKey],
+  );
 
   const remove = async (row) => {
     if (!window.confirm('确认删除该条巡查记录？关联的问题记录不会被删除。')) return;
@@ -67,17 +77,12 @@ export default function InspectionListPage() {
                 onChange={(event) => list.updateFilter('keyword', event.target.value)}
               />
             </Field>
-            <Field label="所属区域">
-              <select
-                value={list.filters.district}
-                onChange={(event) => list.updateFilter('district', event.target.value)}
-              >
-                <option value="">全部</option>
-                {(districts || []).map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </Field>
+            <ScopeFields
+              districts={districts || []}
+              grades={dictionaries?.restroom_grade || []}
+              value={list.filters}
+              onChange={list.updateFilter}
+            />
             <Field label="班次">
               <select
                 value={list.filters.shift}
@@ -116,8 +121,15 @@ export default function InspectionListPage() {
             <button type="button" className="btn" onClick={list.resetFilters}>
               重置
             </button>
+            <MethodologyButton />
           </div>
         </section>
+
+        <GroupSummaryCard
+          title="巡查分组统计"
+          loading={summary.loading}
+          summary={summary.data}
+        />
 
         <section className="card">
           <DataTable
@@ -142,10 +154,15 @@ export default function InspectionListPage() {
                   ),
               },
               { key: 'district', title: '区域', render: (row) => row.restroom?.district ?? '-' },
+              {
+                key: 'restroom_grade',
+                title: '公厕等级',
+                render: (row) => row.restroom?.grade ?? '-',
+              },
               { key: 'inspector', title: '巡查人' },
               { key: 'shift', title: '班次' },
               { key: 'score', title: '得分', render: (row) => <ScorePill score={row.score} /> },
-              { key: 'grade', title: '等级', render: (row) => <GradeTag grade={row.grade} /> },
+              { key: 'grade', title: '评分等级', render: (row) => <GradeTag grade={row.grade} /> },
               { key: 'result', title: '结论', render: (row) => <StatusTag status={row.result} /> },
               { key: 'issue_count', title: '关联问题' },
               {
