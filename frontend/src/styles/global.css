@@ -558,6 +558,31 @@ table.data-table td.wrap {
   color: #1e40af;
 }
 
+/* 看板统计口径说明 */
+.scope-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.scope-tag {
+  flex: none;
+  font-weight: 600;
+  background: #1e40af;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.scope-loading {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
 .toast {
   position: fixed;
   right: 24px;

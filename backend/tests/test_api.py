@@ -223,3 +223,83 @@ def test_dashboard_stats(client, restroom):
     }
     assert payload["top_restrooms"]
     assert "rectification_rate" in overview
+
+
+def test_dashboard_scope_by_district_and_grade(client):
+    """区域 + 公厕等级口径应贯穿指标卡、分组、区域、排行与最新列表。"""
+    grade_two = client.post(
+        "/api/v1/restrooms",
+        json={"name": "口径二类公厕", "district": "口径测试区", "address": "口径路 1 号", "grade": "二类"},
+    ).json()
+    grade_one = client.post(
+        "/api/v1/restrooms",
+        json={"name": "口径一类公厕", "district": "口径测试区", "address": "口径路 2 号", "grade": "一类"},
+    ).json()
+
+    for restroom_id in (grade_two["id"], grade_one["id"]):
+        client.post(
+            "/api/v1/inspections",
+            json={"restroom_id": restroom_id, "inspector": "口径巡查", "items": full_items(8)},
+        )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": grade_two["id"], "title": "二类公厕问题", "category": "保洁不到位"},
+    )
+    client.post(
+        "/api/v1/issues",
+        json={"restroom_id": grade_one["id"], "title": "一类公厕问题", "category": "设施损坏"},
+    )
+
+    payload = client.get(
+        "/api/v1/stats/dashboard",
+        params={"district": "口径测试区", "grade": "二类"},
+    ).json()
+
+    # 口径说明回显筛选条件
+    assert "口径测试区" in payload["scope"]["description"]
+    assert "二类" in payload["scope"]["description"]
+
+    overview = payload["overview"]
+    assert overview["restroom_total"] == 1
+    assert overview["inspection_total"] == 1
+    assert overview["issue_total"] == 1
+    assert overview["issue_open"] == 1
+
+    # 状态/分类分组求和与指标卡总数一致
+    assert sum(item["value"] for item in payload["issue_by_status"]) == 1
+    category_rows = {item["category"]: item for item in payload["issue_by_category"]}
+    assert category_rows["保洁不到位"]["total"] == 1
+    assert category_rows["设施损坏"]["total"] == 0
+
+    # 区域分组在等级口径下只剩一座公厕
+    assert len(payload["districts"]) == 1
+    assert payload["districts"][0]["district"] == "口径测试区"
+    assert payload["districts"][0]["restroom_count"] == 1
+
+    # 排行与最新列表也只含口径内公厕
+    assert [item["restroom_id"] for item in payload["top_restrooms"]] == [grade_two["id"]]
+    assert {item["restroom_id"] for item in payload["recent_issues"]} <= {grade_two["id"]}
+    assert {item["restroom_id"] for item in payload["recent_inspections"]} <= {grade_two["id"]}
+
+    # 列表接口同样支持按公厕等级过滤
+    inspections = client.get(
+        "/api/v1/inspections",
+        params={"district": "口径测试区", "grade": "二类"},
+    ).json()
+    assert inspections["meta"]["total"] == 1
+    assert inspections["items"][0]["restroom"]["grade"] == "二类"
+
+    issues = client.get(
+        "/api/v1/issues",
+        params={"district": "口径测试区", "grade": "一类"},
+    ).json()
+    assert issues["meta"]["total"] == 1
+    assert issues["items"][0]["title"] == "一类公厕问题"
+
+    # overview 独立接口也遵循同一口径
+    scoped_overview = client.get(
+        "/api/v1/stats/overview", params={"district": "口径测试区"}
+    ).json()
+    assert scoped_overview["restroom_total"] == 2
+    assert scoped_overview["inspection_total"] == 2
+

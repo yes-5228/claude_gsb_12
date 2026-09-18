@@ -16,6 +16,7 @@ class RestroomBrief(BaseModel):
     code: str
     name: str
     district: str
+    grade: str = ""
     address: str = ""
 
 

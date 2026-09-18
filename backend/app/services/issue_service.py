@@ -70,6 +70,7 @@ def list_issues(
     restroom_id: int | None = None,
     inspection_id: int | None = None,
     district: str | None = None,
+    grade: str | None = None,
     status: str | None = None,
     statuses: list[str] | None = None,
     category: str | None = None,
@@ -84,10 +85,12 @@ def list_issues(
     order: str = "desc",
 ) -> tuple[list[Issue], int]:
     stmt = select(Issue)
-    if district:
-        stmt = stmt.join(Restroom, Restroom.id == Issue.restroom_id).where(
-            Restroom.district == district
-        )
+    if district or grade:
+        stmt = stmt.join(Restroom, Restroom.id == Issue.restroom_id)
+        if district:
+            stmt = stmt.where(Restroom.district == district)
+        if grade:
+            stmt = stmt.where(Restroom.grade == grade)
     if restroom_id:
         stmt = stmt.where(Issue.restroom_id == restroom_id)
     if inspection_id:

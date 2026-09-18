@@ -1,6 +1,11 @@
 import { http } from './client.js';
 
 export const statsApi = {
-  overview: () => http.get('/stats/overview'),
-  dashboard: (trendDays = 14) => http.get('/stats/dashboard', { trend_days: trendDays }),
+  overview: (params) => http.get('/stats/overview', params),
+  dashboard: ({ trendDays = 14, district = '', grade = '' } = {}) =>
+    http.get('/stats/dashboard', {
+      trend_days: trendDays,
+      district,
+      grade,
+    }),
 };

@@ -128,23 +128,24 @@ npm run dev
 | PATCH | `/restrooms/{id}` | 局部更新 |
 | DELETE | `/restrooms/{id}?force=` | 删除；有巡查或问题记录时返回 409，`force=true` 才级联删除 |
 | GET | `/restrooms/meta/districts` | 区域列表（筛选下拉用） |
-| GET | `/inspections` | 巡查记录查询（restroom_id/district/inspector/shift/result/日期区间/关键字） |
+| GET | `/inspections` | 巡查记录查询（restroom_id/district/grade/inspector/shift/result/日期区间/关键字） |
 | POST | `/inspections` | 新增巡查，服务端按检查项自动算分、定级、判定结论 |
 | GET/PATCH/DELETE | `/inspections/{id}` | 详情 / 更新 / 删除 |
-| GET | `/issues` | 问题查询（status/category/severity/district/overdue/open_only/日期区间/关键字） |
+| GET | `/issues` | 问题查询（status/category/severity/district/grade/overdue/open_only/日期区间/关键字） |
 | POST | `/issues` | 上报问题，自动生成编号 `WT-YYYYMMDD-001` 并写入首条整改流水 |
 | GET/PATCH/DELETE | `/issues/{id}` | 详情（含完整整改轨迹）/ 更新 / 删除 |
 | GET | `/issues/{id}/transitions` | 当前状态可执行的流转动作 |
 | POST | `/issues/{id}/transitions` | 推进整改状态（越级流转返回 400） |
 | POST | `/issues/{id}/records` | 追加跟进记录（不改变状态） |
-| GET | `/stats/overview` | 核心指标 |
-| GET | `/stats/dashboard` | 看板聚合数据（趋势、分布、区域、排行、最新记录） |
+| GET | `/stats/overview` | 核心指标（可传 district/grade 按区域与公厕等级统一口径过滤） |
+| GET | `/stats/dashboard` | 看板聚合数据（趋势、分布、区域、排行、最新记录；可传 district/grade，整页与返回的 scope 口径说明保持一致） |
 | GET | `/meta/dictionaries` | 枚举字典（状态、分类、程度、检查项、流转规则） |
 | GET | `/meta/restroom-options` | 公厕下拉选项 |
 | GET | `/health` | 健康检查 |
 
 ## 业务规则
 
+- **统计口径**：看板的指标卡、状态/分类/严重程度分组、趋势、区域运行、重点关注与最新记录共用同一口径，可按「区域 + 公厕等级」圈定公厕范围，巡查与问题均按所属公厕归入该范围；页面顶部展示口径说明，筛选条件变化后列表、分组与看板数字同步刷新。
 - **巡查评分**：8 个检查项各 0-10 分，得分 = 总得分 / 满分 × 100；≥90 优秀、≥80 良好、≥70 合格，其余不合格。任一检查项低于 6 分或等级为不合格时，巡查结论自动置为「发现问题」。
 - **问题编号**：`WT-` + 上报日期 + 当日三位流水号。
 - **整改闭环**：`待整改 → 整改中 → 待验收 → 已完成 → 已关闭`；`待验证` 阶段可被驳回退回 `整改中`，`待整改/整改中` 可直接作废关闭。每次流转都会写入一条整改流水（动作、原状态、新状态、操作人、说明），详情页以时间线呈现。

@@ -19,6 +19,7 @@ import InspectionFormModal from './InspectionFormModal.jsx';
 const DEFAULT_FILTERS = {
   keyword: '',
   district: '',
+  grade: '',
   shift: '',
   result: '',
   date_from: '',
@@ -74,6 +75,17 @@ export default function InspectionListPage() {
               >
                 <option value="">全部</option>
                 {(districts || []).map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="公厕等级">
+              <select
+                value={list.filters.grade}
+                onChange={(event) => list.updateFilter('grade', event.target.value)}
+              >
+                <option value="">全部</option>
+                {(dictionaries?.restroom_grade || []).map((item) => (
                   <option key={item}>{item}</option>
                 ))}
               </select>
@@ -142,6 +154,7 @@ export default function InspectionListPage() {
                   ),
               },
               { key: 'district', title: '区域', render: (row) => row.restroom?.district ?? '-' },
+              { key: 'restroom_grade', title: '公厕等级', render: (row) => row.restroom?.grade ?? '-' },
               { key: 'inspector', title: '巡查人' },
               { key: 'shift', title: '班次' },
               { key: 'score', title: '得分', render: (row) => <ScorePill score={row.score} /> },

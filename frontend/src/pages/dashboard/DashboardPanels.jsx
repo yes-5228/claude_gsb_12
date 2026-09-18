@@ -63,12 +63,12 @@ export function CategoryPanel({ items }) {
   );
 }
 
-export function DistrictPanel({ items }) {
+export function DistrictPanel({ items, scopeFiltered = false }) {
   return (
     <section className="card">
       <div className="card-title">
         <h3>区域运行情况</h3>
-        <span className="hint">按未闭环问题排序</span>
+        <span className="hint">{scopeFiltered ? '当前口径下' : '按未闭环问题排序'}</span>
       </div>
       <DataTable
         columns={[

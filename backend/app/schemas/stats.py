@@ -11,6 +11,14 @@ class NameValue(BaseModel):
     value: float
 
 
+class StatsScope(BaseModel):
+    """看板统计口径：区域与公厕等级过滤及对应的口径说明。"""
+
+    district: str | None = None
+    grade: str | None = None
+    description: str = ""
+
+
 class OverviewStats(BaseModel):
     restroom_total: int = 0
     restroom_open: int = 0
@@ -60,6 +68,7 @@ class DistrictStat(BaseModel):
 class DashboardStats(BaseModel):
     """看板一次拉取所需的全部指标。"""
 
+    scope: StatsScope
     overview: OverviewStats
     issue_by_status: list[NameValue] = Field(default_factory=list)
     issue_by_category: list[CategoryStat] = Field(default_factory=list)

@@ -18,6 +18,7 @@ import IssueFormModal from './IssueFormModal.jsx';
 const DEFAULT_FILTERS = {
   keyword: '',
   district: '',
+  grade: '',
   status: '',
   category: '',
   severity: '',
@@ -130,6 +131,17 @@ export default function IssueListPage() {
                 ))}
               </select>
             </Field>
+            <Field label="公厕等级">
+              <select
+                value={list.filters.grade}
+                onChange={(event) => list.updateFilter('grade', event.target.value)}
+              >
+                <option value="">全部</option>
+                {(dictionaries?.restroom_grade || []).map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="超期情况">
               <select
                 value={list.filters.overdue}
@@ -179,6 +191,16 @@ export default function IssueListPage() {
                   ),
               },
               { key: 'category', title: '分类' },
+              {
+                key: 'district',
+                title: '区域',
+                render: (row) => row.restroom?.district ?? '-',
+              },
+              {
+                key: 'restroom_grade',
+                title: '公厕等级',
+                render: (row) => row.restroom?.grade ?? '-',
+              },
               {
                 key: 'severity',
                 title: '程度',

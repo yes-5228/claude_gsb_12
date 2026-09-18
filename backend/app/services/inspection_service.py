@@ -55,6 +55,7 @@ def list_inspections(
     *,
     restroom_id: int | None = None,
     district: str | None = None,
+    grade: str | None = None,
     inspector: str | None = None,
     shift: str | None = None,
     result: str | None = None,
@@ -67,10 +68,12 @@ def list_inspections(
     order: str = "desc",
 ) -> tuple[list[Inspection], int]:
     stmt = select(Inspection)
-    if district:
-        stmt = stmt.join(Restroom, Restroom.id == Inspection.restroom_id).where(
-            Restroom.district == district
-        )
+    if district or grade:
+        stmt = stmt.join(Restroom, Restroom.id == Inspection.restroom_id)
+        if district:
+            stmt = stmt.where(Restroom.district == district)
+        if grade:
+            stmt = stmt.where(Restroom.grade == grade)
     if restroom_id:
         stmt = stmt.where(Inspection.restroom_id == restroom_id)
     if inspector:

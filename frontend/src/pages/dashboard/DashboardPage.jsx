@@ -1,11 +1,13 @@
 import { useState } from 'react';
 
+import { restroomApi } from '../../api/restrooms.js';
 import { statsApi } from '../../api/stats.js';
 import BarList from '../../components/BarList.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import StatCard from '../../components/StatCard.jsx';
 import TrendChart from '../../components/TrendChart.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
+import { useDictionaries } from '../../hooks/useDictionaries.js';
 import {
   CategoryPanel,
   DistrictPanel,
@@ -18,13 +20,18 @@ import {
 const RANGE_OPTIONS = [7, 14, 30];
 
 export default function DashboardPage() {
+  const { dictionaries } = useDictionaries();
   const [trendDays, setTrendDays] = useState(14);
+  const [district, setDistrict] = useState('');
+  const [grade, setGrade] = useState('');
   const { data, loading, error } = useAsync(
-    () => statsApi.dashboard(trendDays),
-    [trendDays],
+    () => statsApi.dashboard({ trendDays, district, grade }),
+    [trendDays, district, grade],
   );
+  const { data: districts } = useAsync(() => restroomApi.districts(), []);
 
   const overview = data?.overview;
+  const scopeFiltered = Boolean(district || grade);
 
   return (
     <>
@@ -32,20 +39,64 @@ export default function DashboardPage() {
         title="总览看板"
         description="公厕保洁巡查与问题整改的整体运行情况"
         actions={
-          <div className="field" style={{ minWidth: 130 }}>
-            <label>统计区间</label>
-            <select value={trendDays} onChange={(event) => setTrendDays(Number(event.target.value))}>
-              {RANGE_OPTIONS.map((days) => (
-                <option key={days} value={days}>
-                  近 {days} 天
-                </option>
-              ))}
-            </select>
+          <div className="inline">
+            <div className="field" style={{ minWidth: 120 }}>
+              <label>所属区域</label>
+              <select value={district} onChange={(event) => setDistrict(event.target.value)}>
+                <option value="">全部区域</option>
+                {(districts || []).map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ minWidth: 110 }}>
+              <label>公厕等级</label>
+              <select value={grade} onChange={(event) => setGrade(event.target.value)}>
+                <option value="">全部等级</option>
+                {(dictionaries?.restroom_grade || []).map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ minWidth: 110 }}>
+              <label>统计区间</label>
+              <select
+                value={trendDays}
+                onChange={(event) => setTrendDays(Number(event.target.value))}
+              >
+                {RANGE_OPTIONS.map((days) => (
+                  <option key={days} value={days}>
+                    近 {days} 天
+                  </option>
+                ))}
+              </select>
+            </div>
+            {scopeFiltered ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setDistrict('');
+                  setGrade('');
+                }}
+              >
+                清除口径
+              </button>
+            ) : null}
           </div>
         }
       />
       <div className="content">
         {error ? <div className="alert alert-error">{error.message}</div> : null}
+
+        {data?.scope ? (
+          <div className="alert alert-info scope-note">
+            <span className="scope-tag">统计口径</span>
+            {data.scope.description}
+            {loading ? <span className="scope-loading">口径更新中…</span> : null}
+          </div>
+        ) : null}
+
         {loading && !data ? <div className="loading-block">看板数据加载中…</div> : null}
 
         {overview ? (
@@ -122,7 +173,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid-2">
-              <DistrictPanel items={data.districts} />
+              <DistrictPanel items={data.districts} scopeFiltered={scopeFiltered} />
               <RankingPanel items={data.top_restrooms} />
             </div>
 
